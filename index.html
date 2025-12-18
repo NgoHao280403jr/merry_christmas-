@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Giáng Sinh</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Giáng Sinh Lung Linh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
@@ -11,15 +11,21 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
     <style>
-        body { margin: 0; overflow: hidden; background-color: #020205; }
+        body { margin: 0; overflow: hidden; background-color: #020205; touch-action: none; }
         #video-container { transform: scaleX(-1); }
         .glass-ui { background: rgba(20, 0, 10, 0.6); backdrop-filter: blur(12px); border: 1px solid rgba(226, 223, 24, 0.2); }
         .glow { text-shadow: 0 0 10px rgba(224, 193, 14, 0.966); }
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.4); }
+            70% { box-shadow: 0 0 0 10px rgba(234, 179, 8, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(234, 179, 8, 0); }
+        }
+        .cam-active { animation: pulse-border 2s infinite; }
     </style>
 </head>
-<body class="text-white font-sans">
+<body class="text-white font-sans select-none">
 
-    <div class="absolute top-4 left-4 z-50 w-72">
+    <div class="absolute top-4 left-1/2 -translate-x-1/2 md:left-4 md:translate-x-0 z-50 w-[90vw] md:w-72 max-w-sm">
         <div id="info-card" class="glass-ui p-5 rounded-xl shadow-2xl transition-all duration-300">
             <h1 class="text-xl font-bold mb-3 text-yellow-400 tracking-widest text-center border-b border-yellow-500/30 pb-2">MERRY CHRISTMAS</h1>
             
@@ -27,14 +33,14 @@
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 flex items-center justify-center bg-yellow-500/20 rounded-full text-lg border border-yellow-500/50">✊</div>
                     <div>
-                        <span class="block font-bold text-yellow-100">Nắm tay</span>
-                        <span class="text-xs text-yellow-300/70">Hiện Cây & Chữ Vàng</span>
+                        <span class="block font-bold text-yellow-100">Nắm tay (Hoặc Chạm)</span>
+                        <span class="text-xs text-yellow-300/70">Hiện Cây & Chữ</span>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
                     <div class="w-8 h-8 flex items-center justify-center bg-white/10 rounded-full text-lg border border-white/20">✋</div>
                     <div>
-                        <span class="block font-bold text-gray-100">Mở bàn tay</span>
+                        <span class="block font-bold text-gray-100">Mở tay (Hoặc Chạm)</span>
                         <span class="text-xs text-gray-400">Phân tán hạt</span>
                     </div>
                 </div>
@@ -42,13 +48,13 @@
             
             <button onclick="toggleInfo()" class="mt-4 w-full py-1 text-[10px] text-yellow-500/50 hover:text-yellow-400 uppercase tracking-widest">ẨN HƯỚNG DẪN</button>
         </div>
-        <button id="show-btn" onclick="toggleInfo()" class="hidden glass-ui px-4 py-2 rounded-xl font-bold text-yellow-400 text-xs tracking-widest">HIỆN HƯỚNG DẪN</button>
+        <button id="show-btn" onclick="toggleInfo()" class="hidden glass-ui px-4 py-2 rounded-xl font-bold text-yellow-400 text-xs tracking-widest mx-auto block mt-2">HIỆN HƯỚNG DẪN</button>
     </div>
 
     <div class="absolute bottom-6 left-6 z-50 flex flex-col items-center gap-2">
         <div id="cam-border" class="p-1 rounded-full border-2 border-red-900 bg-black/80 transition-colors duration-500 shadow-[0_0_15px_rgba(0,0,0,0.5)]">
-            <div id="video-container" class="w-24 h-24 rounded-full overflow-hidden relative">
-                <video id="input-video" class="w-full h-full object-cover opacity-60"></video>
+            <div id="video-container" class="w-20 h-20 md:w-24 md:h-24 rounded-full overflow-hidden relative">
+                <video id="input-video" class="w-full h-full object-cover opacity-60" playsinline muted autoplay></video>
             </div>
         </div>
         <span id="status-text" class="text-[10px] font-mono font-bold tracking-[0.2em] text-red-500 uppercase glow">Đang Khởi Tạo</span>
@@ -58,34 +64,32 @@
 
     <script>
         /* -------------------------------------------------------------------------- */
-        /* CẤU HÌNH (CONFIGURATION)                                                   */
+        /* CẤU HÌNH MOBILE                                                            */
         /* -------------------------------------------------------------------------- */
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth < 800;
+        
         const CONFIG = {
-            particleCount: 20000, 
-            treeHeight: 45,
+            particleCount: isMobile ? 15000 : 25000, // Tinh chỉnh lại số lượng hạt
+            treeHeight: isMobile ? 40 : 45,
             baseRadius: 16,
             scatterRadius: 80,
-            camDefaultZ: 75,
+            camDefaultZ: isMobile ? 85 : 75,
             colors: {
-                // MÀU CÂY (Xanh lá)
-                treeTop: new THREE.Color('#34d399'),   // Emerald Green
-                treeBot: new THREE.Color('#064e3b'),   // Deep Green
-                
-                // MÀU TRANG TRÍ (Giữ nguyên để cây đẹp)
+                treeTop: new THREE.Color('#34d399'),   
+                treeBot: new THREE.Color('#064e3b'),   
                 ornamentRed: new THREE.Color('#ef4444'),
                 ornamentGold: new THREE.Color('#fbbf24'),
                 ornamentBlue: new THREE.Color('#3b82f6'),
-                
-                // MÀU CHỮ (Chỉ dùng Vàng Kim)
-                textGold: new THREE.Color('#ffffff'),     // GOLD CHUẨN
-                star: new THREE.Color('#ffddaa')          // Sao đỉnh
+                textGold: new THREE.Color('#ffffff'), // Về lại màu trắng gốc
+                star: new THREE.Color('#ffddaa')          
             }
         };
 
         const STATE = {
             mode: 'SCATTER', 
             zoom: CONFIG.camDefaultZ,
-            time: 0
+            time: 0,
+            isGestureActive: false 
         };
 
         /* -------------------------------------------------------------------------- */
@@ -93,32 +97,35 @@
         /* -------------------------------------------------------------------------- */
         const container = document.getElementById('scene-container');
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x020205, 0.02); // Sương mù tối màu
+        scene.fog = new THREE.FogExp2(0x020205, 0.02);
 
         const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
         camera.position.z = CONFIG.camDefaultZ;
 
-        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        const renderer = new THREE.WebGLRenderer({ antialias: !isMobile, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
         container.appendChild(renderer.domElement);
 
         /* -------------------------------------------------------------------------- */
-        /* TẠO TỌA ĐỘ CHỮ                                                             */
+        /* TẠO TỌA ĐỘ CHỮ (REVERT VỀ CODE GỐC)                                        */
         /* -------------------------------------------------------------------------- */
         function generateTextCoordinates() {
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
+            
+            // Quay về kích thước và font cũ
             const width = 500; 
             const height = 250;
             canvas.width = width;
             canvas.height = height;
 
             ctx.fillStyle = 'white';
-            ctx.font = '900 60px "Arial", sans-serif'; 
+            ctx.font = '900 60px "Arial", sans-serif'; // Font gốc
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
+            // Chỉ dùng fillText (không stroke)
             ctx.fillText('MERRY', width / 2, height / 2 - 35);
             ctx.fillText('CHRISTMAS', width / 2, height / 2 + 35);
 
@@ -126,12 +133,13 @@
             const pixels = imgData.data;
             const coords = [];
 
+            // Bước nhảy = 3 như cũ để hạt thưa và thanh mảnh
             for (let y = 0; y < height; y += 3) {
                 for (let x = 0; x < width; x += 3) {
                     const alpha = pixels[(y * width + x) * 4 + 3];
                     if (alpha > 128) {
                         coords.push({
-                            x: (x - width / 2) * 0.2,
+                            x: (x - width / 2) * 0.2, // Scale cũ 0.2
                             y: -(y - height / 2) * 0.2
                         });
                     }
@@ -146,38 +154,38 @@
         /* HỆ THỐNG HẠT                                                               */
         /* -------------------------------------------------------------------------- */
         const geometry = new THREE.BufferGeometry();
-        const posCurrent = new Float32Array(CONFIG.particleCount * 3);
-        const posCombined = new Float32Array(CONFIG.particleCount * 3); 
-        const posScatter = new Float32Array(CONFIG.particleCount * 3);
-        const colorsCombined = new Float32Array(CONFIG.particleCount * 3); 
-        const sizes = new Float32Array(CONFIG.particleCount);
+        const count = CONFIG.particleCount;
+        const posCurrent = new Float32Array(count * 3);
+        const posCombined = new Float32Array(count * 3); 
+        const posScatter = new Float32Array(count * 3);
+        const colorsCombined = new Float32Array(count * 3); 
+        const sizes = new Float32Array(count);
 
         const colorHelper = new THREE.Color();
 
-        for (let i = 0; i < CONFIG.particleCount; i++) {
+        for (let i = 0; i < count; i++) {
             const i3 = i * 3;
             const isTextParticle = i < textCoords.length;
 
             if (isTextParticle) {
-                // === [LOGIC CHỮ: VÀNG KIM] ===
+                // === [LOGIC CHỮ: KHÔI PHỤC] ===
                 const textPt = textCoords[i];
                 posCombined[i3] = textPt.x;
-                posCombined[i3+1] = textPt.y - 25; 
-                posCombined[i3+2] = (Math.random() - 0.5) * 2; 
+                posCombined[i3+1] = textPt.y - 25; // Vị trí Y cũ
+                posCombined[i3+2] = (Math.random() - 0.5) * 2; // Độ sâu Z cũ (dày hơn một chút)
 
-                // CHỈ SET MÀU VÀNG KIM
                 colorHelper.set(CONFIG.colors.textGold);
                 
-                // Tạo một chút biến thể độ sáng để trông lấp lánh như kim loại
+                // Logic màu cũ
                 const brightness = 0.8 + Math.random() * 0.4; 
                 colorsCombined[i3] = colorHelper.r * brightness;
                 colorsCombined[i3+1] = colorHelper.g * brightness;
                 colorsCombined[i3+2] = colorHelper.b * brightness;
                 
-                sizes[i] = 1.3; // Hạt chữ to hơn chút
+                sizes[i] = 1.3; // Size gốc
 
             } else {
-                // === [LOGIC CÂY: XANH LÁ] ===
+                // === [LOGIC CÂY] ===
                 let txTree, tyTree, tzTree, rTree, angleTree, hTree;
                 const type = Math.random(); 
 
@@ -199,30 +207,17 @@
                     colorHelper.set(CONFIG.colors.ornamentGold);
                     sizes[i] = 0.8;
                 } else { 
-                    // === LÁ THÔNG: XANH ===
+                    // Lá thông
                     hTree = Math.random();
                     angleTree = i * 0.15;
                     rTree = (1 - hTree) * CONFIG.baseRadius + (Math.random() - 0.5) * 1.5;
-                    
-                    // Gradient từ Xanh đậm (gốc) lên Xanh ngọc (ngọn)
                     colorHelper.lerpColors(CONFIG.colors.treeBot, CONFIG.colors.treeTop, hTree);
                     sizes[i] = 0.6;
                 }
 
-                // Lưu màu cây
-                if(type <= 0.96 && type > 0.85) { // Dây kim tuyến
-                     colorsCombined[i3] = colorHelper.r;
-                     colorsCombined[i3+1] = colorHelper.g;
-                     colorsCombined[i3+2] = colorHelper.b;
-                } else if(type <= 0.85) { // Lá thông
-                     colorsCombined[i3] = colorHelper.r;
-                     colorsCombined[i3+1] = colorHelper.g;
-                     colorsCombined[i3+2] = colorHelper.b;
-                } else { // Ornament
-                     colorsCombined[i3] = colorHelper.r;
-                     colorsCombined[i3+1] = colorHelper.g;
-                     colorsCombined[i3+2] = colorHelper.b;
-                }
+                colorsCombined[i3] = colorHelper.r;
+                colorsCombined[i3+1] = colorHelper.g;
+                colorsCombined[i3+2] = colorHelper.b;
 
                 txTree = Math.cos(angleTree) * rTree;
                 tyTree = (hTree * CONFIG.treeHeight) - (CONFIG.treeHeight / 2) + 15; 
@@ -301,31 +296,29 @@
             const cols = particles.geometry.attributes.color.array;
             
             let targetArray;
-            let speed;
+            let speed = isMobile ? 0.08 : 0.06;
             
             if (STATE.mode === 'COMBINED') {
                 targetArray = posCombined;
-                speed = 0.06;
                 starMesh.visible = true;
             } else { 
                 targetArray = posScatter;
-                speed = 0.03;
                 starMesh.visible = false;
             }
 
-            for (let i = 0; i < CONFIG.particleCount; i++) {
+            for (let i = 0; i < count; i++) {
                 const i3 = i * 3;
                 let tx = targetArray[i3];
                 let ty = targetArray[i3+1];
                 let tz = targetArray[i3+2];
 
                 if (STATE.mode === 'COMBINED') {
-                    if (ty > -10) { // Cây
+                    if (ty > -10 && i >= textCoords.length) { 
                         const breathe = 1.0 + Math.sin(STATE.time * 2 + ty * 0.1) * 0.003;
                         tx *= breathe;
                         tz *= breathe;
                     }
-                } else { // Scatter
+                } else { 
                     tx += Math.sin(STATE.time + i) * 0.5;
                 }
 
@@ -333,21 +326,16 @@
                 positions[i3+1] += (ty - positions[i3+1]) * speed;
                 positions[i3+2] += (tz - positions[i3+2]) * speed;
 
-                // Color Logic
+                // Color Logic gốc
                 if (STATE.mode === 'COMBINED') {
-                    // Chuyển dần về màu gốc (Vàng kim cho chữ / Xanh cho cây)
                     cols[i3] += (colorsCombined[i3] - cols[i3]) * 0.05;
                     cols[i3+1] += (colorsCombined[i3+1] - cols[i3+1]) * 0.05;
                     cols[i3+2] += (colorsCombined[i3+2] - cols[i3+2]) * 0.05;
                     
-                    // Hiệu ứng lấp lánh (Sparkle)
-                    // Nếu là cây: lấp lánh trắng nhẹ
-                    // Nếu là chữ: lấp lánh sáng hơn
                     if (Math.random() > 0.995) {
                         cols[i3] = 1; cols[i3+1] = 1; cols[i3+2] = 1;
                     }
                 } else {
-                    // Khi scatter thì làm sáng lên
                     cols[i3] = Math.min(colorsCombined[i3] * 1.5, 1);
                     cols[i3+1] = Math.min(colorsCombined[i3+1] * 1.5, 1);
                     cols[i3+2] = Math.min(colorsCombined[i3+2] * 1.5, 1);
@@ -373,57 +361,97 @@
         animate();
 
         /* -------------------------------------------------------------------------- */
-        /* MEDIA PIPE & GESTURE                                                       */
+        /* TƯƠNG TÁC (TOUCH & MEDIA PIPE)                                             */
         /* -------------------------------------------------------------------------- */
         const videoElement = document.getElementById('input-video');
         const statusBorder = document.getElementById('cam-border');
         const statusText = document.getElementById('status-text');
 
+        // == TOUCH CHO MOBILE ==
+        window.addEventListener('click', () => {
+            if (STATE.isGestureActive) return;
+
+            if (STATE.mode === 'SCATTER') {
+                setMode('COMBINED');
+            } else {
+                setMode('SCATTER');
+            }
+        });
+
+        function setMode(mode) {
+            STATE.mode = mode;
+            if (mode === 'COMBINED') {
+                STATE.zoom = CONFIG.camDefaultZ;
+                statusText.innerText = isMobile ? "CHẠM: HIỆN HÌNH" : "NẮM TAY: HIỆN HÌNH";
+                statusBorder.classList.replace('border-yellow-400', 'border-yellow-600');
+                statusBorder.classList.replace('border-gray-500', 'border-yellow-600');
+                statusBorder.classList.add('cam-active');
+            } else {
+                statusText.innerText = isMobile ? "CHẠM: PHÂN TÁN" : "MỞ TAY: PHÂN TÁN";
+                statusBorder.classList.remove('border-yellow-600');
+                statusBorder.classList.add('border-gray-500');
+                statusBorder.classList.remove('cam-active');
+            }
+        }
+
+        // == MEDIA PIPE ==
         function onResults(results) {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+                STATE.isGestureActive = true;
                 const lm = results.multiHandLandmarks[0];
-                statusBorder.classList.replace('border-red-900', 'border-yellow-400');
+                
+                statusBorder.classList.remove('border-red-900');
+                statusBorder.classList.add('border-yellow-400');
                 statusText.innerText = "ĐANG THEO DÕI";
-                statusText.classList.replace('text-red-500', 'text-yellow-400');
+                
                 detectGesture(lm);
             } else {
-                statusBorder.classList.replace('border-yellow-400', 'border-red-900');
-                statusText.innerText = "ĐANG TÌM KIẾM";
-                statusText.classList.replace('text-yellow-400', 'text-red-500');
+                STATE.isGestureActive = false;
+                statusBorder.classList.add('border-red-900');
+                statusBorder.classList.remove('border-yellow-400');
+                statusText.innerText = isMobile ? "CHẠM MÀN HÌNH" : "TÌM CAMERA...";
             }
         }
 
         function detectGesture(lm) {
             const isFingerCurled = (tip, pip, mcp) => { return tip.y > pip.y && pip.y > mcp.y; };
-            const thumbTip = lm[4]; const indexTip = lm[8]; const middleTip = lm[12]; const ringTip = lm[16]; const pinkyTip = lm[20];
+            const indexTip = lm[8]; const middleTip = lm[12]; const ringTip = lm[16]; const pinkyTip = lm[20];
             const indexPIP = lm[6]; const middlePIP = lm[10]; const ringPIP = lm[14]; const pinkyPIP = lm[18];
             const indexMCP = lm[5]; const middleMCP = lm[9]; const ringMCP = lm[13]; const pinkyMCP = lm[17];
-            const wrist = lm[0];
+            
+            const fingersFolded = [
+                isFingerCurled(indexTip, indexPIP, indexMCP),
+                isFingerCurled(middleTip, middlePIP, middleMCP),
+                isFingerCurled(ringTip, ringPIP, ringMCP),
+                isFingerCurled(pinkyTip, pinkyPIP, pinkyMCP)
+            ].filter(Boolean).length;
 
-            const isFist = isFingerCurled(indexTip, indexPIP, indexMCP) && isFingerCurled(middleTip, middlePIP, middleMCP) && isFingerCurled(ringTip, ringPIP, ringMCP) && isFingerCurled(pinkyTip, pinkyPIP, pinkyMCP);
-            const isOpenHand = !isFingerCurled(indexTip, indexPIP, indexMCP) && !isFingerCurled(middleTip, middlePIP, middleMCP) && !isFingerCurled(ringTip, ringPIP, ringMCP) && !isFingerCurled(pinkyTip, pinkyPIP, pinkyMCP) && (thumbTip.y < wrist.y - 0.05);
-
-            if (isFist) {
-                STATE.mode = 'COMBINED';
-                STATE.zoom = CONFIG.camDefaultZ;
-                statusText.innerText = "NẮM TAY: HIỆN HÌNH";
-                statusBorder.classList.replace('border-yellow-400', 'border-yellow-600');
-            } else if (isOpenHand) {
-                STATE.mode = 'SCATTER';
-                statusText.innerText = "MỞ TAY: PHÂN TÁN";
-                statusBorder.classList.replace('border-yellow-400', 'border-gray-500');
+            if (fingersFolded >= 3) {
+                setMode('COMBINED');
+            } else {
+                setMode('SCATTER');
             }
         }
 
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.setOptions({ 
+            maxNumHands: 1, 
+            modelComplexity: isMobile ? 0 : 1, 
+            minDetectionConfidence: 0.5, 
+            minTrackingConfidence: 0.5 
+        });
         hands.onResults(onResults);
 
         const cameraUtils = new Camera(videoElement, {
             onFrame: async () => { await hands.send({image: videoElement}); },
-            width: 320, height: 240
+            width: 320, height: 240,
+            facingMode: 'user'
         });
-        cameraUtils.start();
+        
+        cameraUtils.start().catch(e => {
+            console.log("Camera error:", e);
+            statusText.innerText = "CHẠM ĐỂ CHƠI";
+        });
 
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
